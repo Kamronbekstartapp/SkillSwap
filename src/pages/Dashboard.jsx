@@ -163,8 +163,8 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="space-y-1 mb-6 text-xs text-slate-500 dark:text-slate-400">
-                      <p>Email: <span className="text-slate-700 dark:text-slate-300 font-medium">{u.email}</span></p>
-                    </div>
+  <p>Email: <span className="text-slate-700 dark:text-slate-300 font-medium">{u.email || u.mail || 'Email yoʻq'}</span></p>
+</div>
                   </div>
                   
                   <div>
