@@ -153,8 +153,8 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                            {u.username} <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" />
-                          </h4>
+  {u.username || u.name || u.displayName || 'Nomaʼlum'} <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" />
+</h4>
                           <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold capitalize">
                             {u.role === 'learner' ? "O'rganuvchi" : u.role === 'teacher' ? "O'rgatuvchi" : "Ikkalasi"}
                           </span>
