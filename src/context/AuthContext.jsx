@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { auth, googleProvider, db } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 
 export const AuthContext = createContext();
@@ -9,6 +9,23 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Mobil qurilmalarda redirect natijasini ushlab qolish uchun
+  useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (result && result.user) {
+        const user = result.user;
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists()) {
+          setCurrentUser(userSnap.data());
+        }
+      }
+    }).catch((error) => {
+      console.error("Redirect orqali kirishda xatolik:", error);
+    });
+  }, []);
 
   // Firebase orqali foydalanuvchilar va joriy foydalanuvchini kuzatib borish
   useEffect(() => {
@@ -41,12 +58,20 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // 1. Google orqali RO'YXATDAN O'TISH (Signup with Google)
+  // 1. Google orqali RO'YXATDAN O'TISH (Mobil uchun redirect, kompyuter uchun popup)
   const registerWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      let result;
 
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      } else {
+        result = await signInWithPopup(auth, googleProvider);
+      }
+
+      const user = result.user;
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -60,7 +85,6 @@ export function AuthProvider({ children }) {
         };
       }
 
-      // Agar yangi bo'lsa, vaqtincha obyekt qaytaramiz (yoki ro'yxatdan o'tkazish formasiga yo'naltirasiz)
       return { 
         success: true, 
         user: {
@@ -80,9 +104,17 @@ export function AuthProvider({ children }) {
   // 2. Google orqali TIZIMGA KIRISH (Login with Google)
   const loginWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      let result;
 
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      } else {
+        result = await signInWithPopup(auth, googleProvider);
+      }
+
+      const user = result.user;
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 

@@ -3,6 +3,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics } from "firebase/analytics";
 
+
 const firebaseConfig = {
   apiKey: "AIzaSyBpVXgKOUOptR7kW_zFOgUey9hEDsZpzF4",
   authDomain: "skillswap-8efd4.firebaseapp.com",
@@ -18,4 +19,7 @@ getAnalytics(app);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 export const db = getFirestore(app);
