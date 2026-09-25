@@ -4,7 +4,7 @@ import Sidebar from '../components/Sidebar';
 import { AuthContext } from '../context/AuthContext';
 import { Search, Sparkles, ArrowRight, ShieldCheck, Users } from 'lucide-react';
 
-// Qurilma turini aniqlash uchun maxsus hook (to'g'ridan-to'g'ri shu yerga joylandi)
+// Qurilma turini aniqlash uchun maxsus hook
 function useDeviceType() {
   const [deviceType, setDeviceType] = useState('desktop');
 
@@ -33,7 +33,6 @@ export default function Dashboard() {
   const { currentUser, users } = useContext(AuthContext);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Qurilma turini aniqlash hooki ishlatildi ('mobile', 'tablet' yoki 'desktop' qaytaradi)
   const device = useDeviceType();
 
   // O'zini o'zi qidiruv natijasida ko'rsatib qolmasligi uchun
@@ -127,60 +126,65 @@ export default function Dashboard() {
               <Users size={20} className="text-blue-600" />Barcha foydalanuvchilar
             </h2>
             <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-3 py-1 rounded-lg border border-blue-100 dark:border-blue-900">
-              Jami: {filteredUsers.length} ta
+              Jami: {filteredUsers.filter(u => u.username || u.email).length} ta
             </span>
           </div>
 
-          {filteredUsers.length === 0 ? (
+          {filteredUsers.filter(u => u.username || u.email).length === 0 ? (
             <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-slate-200 dark:border-slate-800 text-center shadow-sm">
               <Users size={48} className="mx-auto text-slate-300 dark:text-slate-700 mb-3" />
               <h3 className="text-base font-bold text-slate-800 dark:text-white mb-1">Hozircha boshqa foydalanuvchilar yo'q</h3>
-              <p className="text-slate-500 dark:text-slate-400 text-sm">Boshqa brauzer yoki inkognito oynada yangi akkaunt ochib sinab ko'ring.</p>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Yangi foydalanuvchi qo'shilganda shu yerda avtomatik paydo bo'ladi.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {filteredUsers.map((u, i) => (
-                <div key={i} className="min-w-0 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-300 flex flex-col justify-between group">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl overflow-hidden flex items-center justify-center font-bold text-white shadow-md">
-                          {u.avatar ? (
-                            <img src={u.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                          ) : (
-                            u.username?.[0]?.toUpperCase() || 'U'
-                          )}
+              {filteredUsers.map((u, i) => {
+                // Agar foydalanuvchining ismi ham, emaili ham bo'lmasa, div umuman ko'rsatilmaydi
+                if (!u.username && !u.email) return null;
+
+                return (
+                  <div key={i} className="min-w-0 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-blue-200 dark:hover:border-blue-800 transition-all duration-300 flex flex-col justify-between group">
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl overflow-hidden flex items-center justify-center font-bold text-white shadow-md">
+                            {u.avatar ? (
+                              <img src={u.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                              u.username?.[0]?.toUpperCase() || 'U'
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                              {u.username || u.name || u.displayName || 'Nomaʼlum'} <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" />
+                            </h4>
+                            <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold capitalize">
+                              {u.role === 'learner' ? "O'rganuvchi" : u.role === 'teacher' ? "O'rgatuvchi" : "Ikkalasi"}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-  {u.username || u.name || u.displayName || 'Nomaʼlum'} <ShieldCheck size={14} className="text-blue-600 dark:text-blue-400" />
-</h4>
-                          <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold capitalize">
-                            {u.role === 'learner' ? "O'rganuvchi" : u.role === 'teacher' ? "O'rgatuvchi" : "Ikkalasi"}
-                          </span>
-                        </div>
+                      </div>
+                      
+                      <div className="space-y-1 mb-6 text-xs text-slate-500 dark:text-slate-400">
+                        <p>Email: <span className="text-slate-700 dark:text-slate-300 font-medium">{u.email || u.mail || 'Email yoʻq'}</span></p>
                       </div>
                     </div>
                     
-                    <div className="space-y-1 mb-6 text-xs text-slate-500 dark:text-slate-400">
-  <p>Email: <span className="text-slate-700 dark:text-slate-300 font-medium">{u.email || u.mail || 'Email yoʻq'}</span></p>
-</div>
+                    <div>
+                      <button 
+                        onClick={() => {
+                          if (!currentUser) navigate('/login');
+                          else navigate('/chat');
+                        }} 
+                        className="w-full py-3 bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 dark:hover:bg-blue-600 text-white rounded-2xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md group-hover:shadow-blue-600/20"
+                      >
+                        <span>Bog'lanish</span>
+                        <ArrowRight size={16} />
+                      </button>
+                    </div>
                   </div>
-                  
-                  <div>
-                    <button 
-                      onClick={() => {
-                        if (!currentUser) navigate('/login');
-                        else navigate('/chat');
-                      }} 
-                      className="w-full py-3 bg-slate-900 dark:bg-slate-800 hover:bg-blue-600 dark:hover:bg-blue-600 text-white rounded-2xl font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-md group-hover:shadow-blue-600/20"
-                    >
-                      <span>Bog'lanish</span>
-                      <ArrowRight size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
