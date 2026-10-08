@@ -68,161 +68,392 @@ export default function Chat() {
     return () => unsubscribe();
   }, [currentChatId]);
 
-  // Qo'ng'iroqlarni tinglash va ICE candidate'larni ulash
-  useEffect(() => {
-    if (!currentUser?.email) return;
-
-    const callDocRef = doc(db, "calls", currentUser.email);
-    const unsubscribe = onSnapshot(callDocRef, async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        
-        if (data.status === 'calling' && !callActive && data.offer && !incomingCall) {
-          setIncomingCall(data);
-        } else if (data.status === 'connected' && peerConnectionRef.current && data.answer && !peerConnectionRef.current.remoteDescription) {
-          const remoteDesc = new RTCSessionDescription(data.answer);
-          await peerConnectionRef.current.setRemoteDescription(remoteDesc);
-        } else if (data.candidate && peerConnectionRef.current) {
-          try {
-            await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-          } catch (e) {}
-        } else if (data.status === 'ended') {
-          hangUpCall(false);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [currentUser, callActive, incomingCall]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (contextMenu.visible) {
-        setContextMenu({ visible: false, x: 0, y: 0, message: null });
-      }
-    };
-    window.addEventListener('click', handleClickOutside);
-    return () => window.removeEventListener('click', handleClickOutside);
-  }, [contextMenu.visible]);
+  // ==================== WEBRTC QO'NG'IROQ ====================
 
   const servers = {
     iceServers: [
-      { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }
+      {
+        urls: [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302'
+        ]
+      }
+      // TURN server bo'lsa shu yerga qo'shing.
+      // {
+      //   urls: 'turn:YOUR_TURN_SERVER',
+      //   username: 'YOUR_USERNAME',
+      //   credential: 'YOUR_PASSWORD'
+      // }
     ]
   };
 
-  const createPeerConnection = (targetEmail) => {
-    const pc = new RTCPeerConnection(servers);
-    peerConnectionRef.current = pc;
+  const candidateUnsubscribeRef = useRef(null);
+  const pendingCandidatesRef = useRef([]);
+  const remoteDescriptionSetRef = useRef(false);
 
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        updateDoc(doc(db, "calls", targetEmail), {
-          candidate: event.candidate.toJSON()
-        }).catch(() => {
-          setDoc(doc(db, "calls", targetEmail), { candidate: event.candidate.toJSON() }, { merge: true });
-        });
+  const getCallId = (email1, email2) => {
+    return [email1, email2].sort().join('_');
+  };
+
+  const addPendingCandidates = async () => {
+    if (!peerConnectionRef.current) return;
+
+    for (const candidate of pendingCandidatesRef.current) {
+      try {
+        await peerConnectionRef.current.addIceCandidate(candidate);
+      } catch (error) {
+        console.error("ICE candidate qo'shib bo'lmadi:", error);
+      }
+    }
+
+    pendingCandidatesRef.current = [];
+  };
+
+  const createPeerConnection = async (targetEmail, role) => {
+    const callId = getCallId(currentUser.email, targetEmail);
+    const pc = new RTCPeerConnection(servers);
+
+    peerConnectionRef.current = pc;
+    remoteDescriptionSetRef.current = false;
+    pendingCandidatesRef.current = [];
+
+    pc.onicecandidate = async (event) => {
+      if (!event.candidate) return;
+
+      try {
+        const collectionName = role === 'caller'
+          ? 'callerCandidates'
+          : 'receiverCandidates';
+
+        await addDoc(
+          collection(db, 'calls', callId, collectionName),
+          event.candidate.toJSON()
+        );
+
+        console.log('ICE candidate yuborildi');
+      } catch (error) {
+        console.error('ICE candidate yuborishda xato:', error);
       }
     };
 
     pc.ontrack = (event) => {
+      console.log('Remote track keldi');
+
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
       }
     };
 
+    pc.onconnectionstatechange = () => {
+      console.log('WebRTC connection:', pc.connectionState);
+
+      if (pc.connectionState === 'failed') {
+        console.error('WebRTC connection FAILED');
+      }
+
+      if (pc.connectionState === 'disconnected') {
+        console.warn('WebRTC connection DISCONNECTED');
+      }
+
+      if (pc.connectionState === 'connected') {
+        console.log('WebRTC connection CONNECTED');
+      }
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log('ICE connection:', pc.iceConnectionState);
+
+      if (pc.iceConnectionState === 'failed') {
+        console.error('ICE connection FAILED');
+      }
+    };
+
+    const remoteCollectionName = role === 'caller'
+      ? 'receiverCandidates'
+      : 'callerCandidates';
+
+    const candidateQuery = collection(
+      db,
+      'calls',
+      callId,
+      remoteCollectionName
+    );
+
+    if (candidateUnsubscribeRef.current) {
+      candidateUnsubscribeRef.current();
+    }
+
+    candidateUnsubscribeRef.current = onSnapshot(
+      candidateQuery,
+      async (snapshot) => {
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== 'added') continue;
+
+          const candidateData = change.doc.data();
+          const candidate = new RTCIceCandidate(candidateData);
+
+          if (remoteDescriptionSetRef.current) {
+            try {
+              await pc.addIceCandidate(candidate);
+              console.log('Remote ICE candidate qo\'shildi');
+            } catch (error) {
+              console.error('Remote ICE candidate xatosi:', error);
+            }
+          } else {
+            pendingCandidatesRef.current.push(candidate);
+          }
+        }
+      }
+    );
+
     return pc;
   };
 
   const startCall = async (type) => {
-    if (!selectedUser) return;
-    setCallType(type);
-    setCallActive(true);
+    if (!selectedUser || !currentUser) return;
 
     try {
+      setCallType(type);
+      setCallActive(true);
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: type === 'video',
         audio: true
       });
+
       localStreamRef.current = stream;
+
       if (localVideoRef.current && type === 'video') {
         localVideoRef.current.srcObject = stream;
       }
 
-      const pc = createPeerConnection(selectedUser.email);
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      const pc = await createPeerConnection(
+        selectedUser.email,
+        'caller'
+      );
+
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      await setDoc(doc(db, "calls", selectedUser.email), {
+      const callId = getCallId(
+        currentUser.email,
+        selectedUser.email
+      );
+
+      await setDoc(doc(db, 'calls', callId), {
         caller: currentUser.email,
         callerName: currentUser.username || currentUser.email,
-        type: type,
-        offer: { type: offer.type, sdp: offer.sdp },
-        status: 'calling'
+        receiver: selectedUser.email,
+        receiverName: selectedUser.username || selectedUser.email,
+        type,
+        offer: {
+          type: offer.type,
+          sdp: offer.sdp
+        },
+        status: 'calling',
+        createdAt: serverTimestamp()
       });
+
+      console.log("Qo'ng'iroq yuborildi");
     } catch (error) {
-      alert("Kamera yoki mikrofon ruxsati berilmadi!");
-      hangUpCall();
+      console.error("Qo'ng'iroq boshlash xatosi:", error);
+      alert('Kamera yoki mikrofon ruxsati berilmadi!');
+      await hangUpCall(false);
     }
   };
 
   const answerCall = async () => {
-    if (!incomingCall) return;
-    setCallType(incomingCall.type);
-    setCallActive(true);
-    const callerEmail = incomingCall.caller;
-    setIncomingCall(null);
+    if (!incomingCall || !currentUser) return;
 
     try {
+      setCallType(incomingCall.type);
+      setCallActive(true);
+
+      const callerEmail = incomingCall.caller;
+      const callId = incomingCall.callId;
+
+      setIncomingCall(null);
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: incomingCall.type === 'video',
         audio: true
       });
+
       localStreamRef.current = stream;
+
       if (localVideoRef.current && incomingCall.type === 'video') {
         localVideoRef.current.srcObject = stream;
       }
 
-      const pc = createPeerConnection(callerEmail);
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      const pc = await createPeerConnection(
+        callerEmail,
+        'receiver'
+      );
 
-      const remoteDesc = new RTCSessionDescription(incomingCall.offer);
+      stream.getTracks().forEach((track) => {
+        pc.addTrack(track, stream);
+      });
+
+      const remoteDesc = new RTCSessionDescription(
+        incomingCall.offer
+      );
+
       await pc.setRemoteDescription(remoteDesc);
+      remoteDescriptionSetRef.current = true;
+
+      await addPendingCandidates();
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      await updateDoc(doc(db, "calls", callerEmail), {
-        answer: { type: answer.type, sdp: answer.sdp },
+      await updateDoc(doc(db, 'calls', callId), {
+        answer: {
+          type: answer.type,
+          sdp: answer.sdp
+        },
         status: 'connected'
       });
+
+      console.log("Qo'ng'iroqqa javob berildi");
     } catch (error) {
-      hangUpCall();
+      console.error("Answer call xatosi:", error);
+      await hangUpCall(false);
     }
   };
 
+  // Barcha qo'ng'iroq signalizatsiyasini tinglash
+  useEffect(() => {
+    if (!currentUser?.email) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, 'calls'),
+      async (snapshot) => {
+        for (const change of snapshot.docChanges()) {
+          if (change.type !== 'added' && change.type !== 'modified') continue;
+
+          const data = change.doc.data();
+
+          // Kiruvchi qo'ng'iroq
+          if (
+            data.receiver === currentUser.email &&
+            data.status === 'calling' &&
+            data.offer &&
+            !callActive &&
+            !incomingCall
+          ) {
+            console.log('Incoming call:', data.caller);
+
+            setIncomingCall({
+              ...data,
+              callId: change.doc.id
+            });
+
+            continue;
+          }
+
+          // Caller answerni qabul qiladi
+          if (
+            data.caller === currentUser.email &&
+            data.status === 'connected' &&
+            data.answer &&
+            peerConnectionRef.current &&
+            !peerConnectionRef.current.remoteDescription
+          ) {
+            try {
+              const remoteDesc = new RTCSessionDescription(data.answer);
+
+              await peerConnectionRef.current.setRemoteDescription(
+                remoteDesc
+              );
+
+              remoteDescriptionSetRef.current = true;
+              await addPendingCandidates();
+
+              console.log('Answer qabul qilindi');
+            } catch (error) {
+              console.error('Answer ulashda xato:', error);
+            }
+          }
+
+          // Qo'ng'iroq tugatilgan
+          if (
+            data.status === 'ended' &&
+            (data.caller === currentUser.email ||
+              data.receiver === currentUser.email)
+          ) {
+            if (callActive || incomingCall) {
+              await hangUpCall(false);
+            }
+          }
+        }
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, callActive, incomingCall]);
+
   const hangUpCall = async (updateDb = true) => {
+    console.log("Call tugatilmoqda");
+
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      localStreamRef.current = null;
     }
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+
+    if (candidateUnsubscribeRef.current) {
+      candidateUnsubscribeRef.current();
+      candidateUnsubscribeRef.current = null;
+    }
+
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
     }
+
+    remoteDescriptionSetRef.current = false;
+    pendingCandidatesRef.current = [];
+
     setCallActive(false);
     setCallType(null);
     setIncomingCall(null);
+    setIsMuted(false);
+    setIsCamOff(false);
 
-    if (updateDb && currentUser?.email && selectedUser?.email) {
-      try {
-        await setDoc(doc(db, "calls", selectedUser.email), { status: 'ended' });
-        await deleteDoc(doc(db, "calls", currentUser.email));
-      } catch (e) {}
+    if (updateDb && currentUser?.email) {
+      const otherEmail = selectedUser?.email || incomingCall?.caller;
+
+      if (otherEmail) {
+        try {
+          const callId = getCallId(
+            currentUser.email,
+            otherEmail
+          );
+
+          await setDoc(
+            doc(db, 'calls', callId),
+            { status: 'ended' },
+            { merge: true }
+          );
+
+          console.log("Call Firestore'da tugatildi");
+        } catch (error) {
+          console.error('Call tugatishda xato:', error);
+        }
+      }
     }
   };
 
@@ -459,7 +690,7 @@ export default function Chat() {
                   <Mic size={40} />
                 </div>
                 <p className="text-sm font-medium text-white">Ovozli qo'ng'iroq...</p>
-                <audio ref={remoteVideoRef} autoPlay />
+                <audio ref={remoteVideoRef} autoPlay playsInline />
               </div>
             )}
           </div>

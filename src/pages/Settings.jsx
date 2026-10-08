@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Sun, Moon, Bell, Shield, Monitor, UserCheck, CheckCircle2, ShieldCheck, LogOut } from 'lucide-react';
+import { Sun, Moon, Bell, Monitor, UserCheck, CheckCircle2, ShieldCheck, LogOut } from 'lucide-react';
 
 export default function Settings() {
   const { theme, toggleTheme } = useContext(ThemeContext);
@@ -140,22 +140,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Privacy Setting */}
-          <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <div className="flex items-center space-x-3 pb-4 border-b border-slate-100 dark:border-slate-800">
-              <Shield className="text-blue-600 dark:text-blue-400" size={22} />
-              <div>
-                <h3 className="text-sm md:text-base font-bold text-slate-900 dark:text-white">Maxfiylik</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Profil xavfsizligi va ko'rinish darajasi</p>
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Profilni qidiruv natijalarida ko'rsatish</span>
-              <input type="checkbox" defaultChecked className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
-            </div>
-          </div>
-
-          {/* Hisobdan chiqish Card (Asosan telefon uchun Settings sahifasida ko'rinadi) */}
+          {/* Hisobdan chiqish Card */}
           {currentUser && (
             <div className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-3xl border border-rose-100 dark:border-rose-950/50 shadow-sm">
               <button

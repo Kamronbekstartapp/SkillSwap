@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, UserCircle, MessageSquareText, Settings as SettingsIcon, LogOut, Sun, Moon, Menu, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, UserCircle, MessageSquareText, Settings as SettingsIcon, LogOut, Sun, Moon, Menu, Sparkles } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
@@ -15,6 +15,7 @@ export default function Sidebar() {
 
   const menuItems = [
     { id: '/', label: 'Bosh sahifa', icon: LayoutDashboard },
+    { id: '/requests', label: "E'lonlar doskasi", icon: Sparkles }, // Yangi qo'shilgan qism
     { id: '/profile', label: 'Profil', icon: UserCircle },
     { id: '/chat', label: 'Chat', icon: MessageSquareText },
     { id: '/settings', label: 'Sozlamalar', icon: SettingsIcon },
@@ -49,7 +50,7 @@ export default function Sidebar() {
               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all mr-[-10px]"
               title={isCollapsed ? "Menyuni ochish" : "Menyuni yopish"}
             >
-              {isCollapsed ? <Menu size={20} /> : <Menu size={20} />}
+              <Menu size={20} />
             </button>
           </div>
 
@@ -131,8 +132,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-
-      {/* 2. TELEFON UCHUN (O'zgarishsiz qoldirildi - Pastdagi Bottom Navigation Bar) */}
+      {/* 2. TELEFON UCHUN (Pastdagi Bottom Navigation Bar - Request qo'shilgan) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-1 py-2 flex items-center z-50 shadow-2xl transition-colors duration-300">
         {menuItems.map((item) => {
           const Icon = item.icon;

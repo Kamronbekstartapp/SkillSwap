@@ -6,7 +6,12 @@ import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    // Sahifa birinchi ochilganda localStorage'dan foydalanuvchini darhol o'qib turish
+    const savedUser = localStorage.getItem('current_user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,10 +23,13 @@ export function AuthProvider({ children }) {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          setCurrentUser(userSnap.data());
+          const userData = userSnap.data();
+          setCurrentUser(userData);
+          localStorage.setItem('current_user', JSON.stringify(userData));
         }
       } else {
-        setCurrentUser(null);
+        // Faqat agar Firebase'da ham sessiya yo'q bo'lsa tozalaymiz
+        // (Email/Parol bilan kirganlar uchun localStorage ishlaydi)
       }
       setLoading(false);
     });
@@ -40,7 +48,7 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // 1. Google orqali RO'YXATDAN O'TISH (Popup orqali barcha qurilmalarda barqaror ishlaydi)
+  // 1. Google orqali RO'YXATDAN O'TISH
   const registerWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -58,15 +66,17 @@ export function AuthProvider({ children }) {
         };
       }
 
+      const newUser = {
+        uid: user.uid,
+        username: user.displayName || "Foydalanuvchi",
+        email: user.email,
+        avatar: user.photoURL || "",
+        role: "learner"
+      };
+
       return { 
         success: true, 
-        user: {
-          uid: user.uid,
-          username: user.displayName || "Foydalanuvchi",
-          email: user.email,
-          avatar: user.photoURL || "",
-          role: "learner"
-        }
+        user: newUser
       };
     } catch (error) {
       console.error("Google orqali ro'yxatdan o'tishda xatolik:", error);
@@ -92,7 +102,9 @@ export function AuthProvider({ children }) {
         };
       }
 
-      setCurrentUser(userSnap.data());
+      const userData = userSnap.data();
+      setCurrentUser(userData);
+      localStorage.setItem('current_user', JSON.stringify(userData));
       return { success: true };
     } catch (error) {
       console.error("Google orqali kirish xatoligi:", error);
@@ -137,7 +149,11 @@ export function AuthProvider({ children }) {
 
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
+      
+      // Joriy foydalanuvchini saqlash (Refresh qilinganda chiqib ketmasligi uchun)
       setCurrentUser(newUser);
+      localStorage.setItem('current_user', JSON.stringify(newUser));
+
       return { success: true };
     } catch (error) {
       return { success: false, message: "Serverda xatolik yuz berdi." };
@@ -151,6 +167,7 @@ export function AuthProvider({ children }) {
 
     if (foundUser) {
       setCurrentUser(foundUser);
+      localStorage.setItem('current_user', JSON.stringify(foundUser)); // localStorage'ga saqlash
       return true;
     }
     return false;
@@ -161,10 +178,12 @@ export function AuthProvider({ children }) {
       await signOut(auth);
     } catch (e) {}
     setCurrentUser(null);
+    localStorage.removeItem('current_user'); // Chiqib ketganda xotirani tozalash
   };
 
   const updateUser = async (updatedData) => {
     setCurrentUser(updatedData);
+    localStorage.setItem('current_user', JSON.stringify(updatedData));
     if (updatedData.uid) {
       try {
         const userRef = doc(db, "users", updatedData.uid);
