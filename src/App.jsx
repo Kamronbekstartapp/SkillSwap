@@ -19,27 +19,27 @@ function App() {
       }
     };
 
-    // 2. Ctrl + (+), Ctrl + (-), Ctrl + (0) klaviatura qisqartmalarini bloklash
-    // const handleKeyDown = (e) => {
-    //   if (
-    //     e.key === 'F12' ||
-    //     e.keyCode === 123 || // F12 ning eski kodi
-    //     (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
-    //     (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
-    //   ) {
-    //     e.preventDefault();
-    //     e.stopPropagation();
-    //     return false;
-    //   }
-    // };
+    2. Ctrl + (+), Ctrl + (-), Ctrl + (0) klaviatura qisqartmalarini bloklash
+    const handleKeyDown = (e) => {
+      if (
+        e.key === 'F12' ||
+        e.keyCode === 123 || // F12 ning eski kodi
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+        (e.ctrlKey && (e.key === 'U' || e.key === 'u'))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
 
-    // window.addEventListener('wheel', handleWheel, { passive: false });
-    // window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('wheel', handleWheel, { passive: false });
+    window.addEventListener('keydown', handleKeyDown);
 
-    // return () => {
-    //   window.removeEventListener('wheel', handleWheel);
-    //   window.removeEventListener('keydown', handleKeyDown);
-    // };
+    return () => {
+      window.removeEventListener('wheel', handleWheel);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   return (
