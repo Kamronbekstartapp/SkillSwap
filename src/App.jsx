@@ -19,7 +19,7 @@ function App() {
       }
     };
 
-    2. Ctrl + (+), Ctrl + (-), Ctrl + (0) klaviatura qisqartmalarini bloklash
+    // 2. Ctrl + (+), Ctrl + (-), Ctrl + (0) klaviatura qisqartmalarini bloklash
     const handleKeyDown = (e) => {
       if (
         e.key === 'F12' ||
