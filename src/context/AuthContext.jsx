@@ -1,3 +1,208 @@
+// import React, { createContext, useState, useEffect } from 'react';
+// import { auth, googleProvider, db } from '../firebase';
+// import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+// import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+
+// export const AuthContext = createContext();
+
+// export function AuthProvider({ children }) {
+//   const [currentUser, setCurrentUser] = useState(() => {
+//     // Sahifa birinchi ochilganda localStorage'dan foydalanuvchini darhol o'qib turish
+//     const savedUser = localStorage.getItem('current_user');
+//     return savedUser ? JSON.parse(savedUser) : null;
+//   });
+  
+//   const [users, setUsers] = useState([]);
+//   const [loading, setLoading] = useState(true);
+
+//   // Firebase orqali foydalanuvchilar va joriy foydalanuvchini kuzatib borish
+//   useEffect(() => {
+//     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+//       if (user) {
+//         const userRef = doc(db, "users", user.uid);
+//         const userSnap = await getDoc(userRef);
+        
+//         if (userSnap.exists()) {
+//           const userData = userSnap.data();
+//           setCurrentUser(userData);
+//           localStorage.setItem('current_user', JSON.stringify(userData));
+//         }
+//       } else {
+//         // Faqat agar Firebase'da ham sessiya yo'q bo'lsa tozalaymiz
+//         // (Email/Parol bilan kirganlar uchun localStorage ishlaydi)
+//       }
+//       setLoading(false);
+//     });
+
+//     const fetchAllUsers = async () => {
+//       try {
+//         const querySnapshot = await getDocs(collection(db, "users"));
+//         const usersList = querySnapshot.docs.map(doc => doc.data());
+//         setUsers(usersList);
+//       } catch (error) {
+//         console.error("Foydalanuvchilarni olishda xatolik:", error);
+//       }
+//     };
+
+//     fetchAllUsers();
+//     return () => unsubscribe();
+//   }, []);
+
+//   // 1. Google orqali RO'YXATDAN O'TISH
+//   const registerWithGoogle = async () => {
+//     try {
+//       const result = await signInWithPopup(auth, googleProvider);
+//       const user = result.user;
+
+//       const userRef = doc(db, "users", user.uid);
+//       const userSnap = await getDoc(userRef);
+
+//       if (userSnap.exists()) {
+//         await signOut(auth);
+//         return { 
+//           success: false, 
+//           exists: true, 
+//           message: "Bu akkaunt allaqachon mavjud! Iltimos, tizimga kiring." 
+//         };
+//       }
+
+//       const newUser = {
+//         uid: user.uid,
+//         username: user.displayName || "Foydalanuvchi",
+//         email: user.email,
+//         avatar: user.photoURL || "",
+//         role: "learner"
+//       };
+
+//       return { 
+//         success: true, 
+//         user: newUser
+//       };
+//     } catch (error) {
+//       console.error("Google orqali ro'yxatdan o'tishda xatolik:", error);
+//       return { success: false, message: "Google orqali ro'yxatdan o'tishda xatolik yuz berdi: " + error.message };
+//     }
+//   };
+
+//   // 2. Google orqali TIZIMGA KIRISH
+//   const loginWithGoogle = async () => {
+//     try {
+//       const result = await signInWithPopup(auth, googleProvider);
+//       const user = result.user;
+
+//       const userRef = doc(db, "users", user.uid);
+//       const userSnap = await getDoc(userRef);
+
+//       if (!userSnap.exists()) {
+//         await signOut(auth);
+//         return { 
+//           success: false, 
+//           exists: false, 
+//           message: "Bu akkaunt saytda mavjud emas, avval ro'yxatdan o'ting!" 
+//         };
+//       }
+
+//       const userData = userSnap.data();
+//       setCurrentUser(userData);
+//       localStorage.setItem('current_user', JSON.stringify(userData));
+//       return { success: true };
+//     } catch (error) {
+//       console.error("Google orqali kirish xatoligi:", error);
+//       return { success: false, message: "Google orqali kirishda xatolik yuz berdi: " + error.message };
+//     }
+//   };
+
+//   const signup = async (userData) => {
+//     const trimmedEmail = userData.email.trim().toLowerCase();
+//     const trimmedUsername = userData.username.trim().toLowerCase();
+
+//     const usernameExists = users.some(u => u.username && u.username.trim().toLowerCase() === trimmedUsername);
+//     if (usernameExists) {
+//       return { success: false, message: "Bu username allaqachon saytda band qilingan!" };
+//     }
+
+//     const emailExists = users.some(u => u.email && u.email.trim().toLowerCase() === trimmedEmail);
+//     if (emailExists) {
+//       return { success: false, message: "Bu email bilan ro'yxatdan o'tilgan account mavjud!" };
+//     }
+
+//     try {
+//       const userId = userData.uid || ('user_' + Date.now());
+//       const newUser = { ...userData, uid: userId };
+
+//       // 1. Firebase'ga yozish
+//       const userRef = doc(db, "users", userId);
+//       await setDoc(userRef, newUser);
+
+//       // 2. Admin panel uchun localStorage'ga ham qo'shib qo'yamiz
+//       const existingLocalStorageUsers = JSON.parse(localStorage.getItem('skillswap_users')) || [];
+//       const adminUserFormat = {
+//         id: userId,
+//         name: newUser.username,
+//         email: newUser.email,
+//         role: newUser.role || 'learner',
+//         status: 'Faol',
+//         createdAt: new Date().toISOString()
+//       };
+//       existingLocalStorageUsers.push(adminUserFormat);
+//       localStorage.setItem('skillswap_users', JSON.stringify(existingLocalStorageUsers));
+
+//       const updatedUsers = [...users, newUser];
+//       setUsers(updatedUsers);
+      
+//       // Joriy foydalanuvchini saqlash (Refresh qilinganda chiqib ketmasligi uchun)
+//       setCurrentUser(newUser);
+//       localStorage.setItem('current_user', JSON.stringify(newUser));
+
+//       return { success: true };
+//     } catch (error) {
+//       return { success: false, message: "Serverda xatolik yuz berdi." };
+//     }
+//   };
+
+//   const login = (email, password) => {
+//     const foundUser = users.find(u => 
+//       u.email && u.email.trim().toLowerCase() === email.trim().toLowerCase() && u.password === password
+//     );
+
+//     if (foundUser) {
+//       setCurrentUser(foundUser);
+//       localStorage.setItem('current_user', JSON.stringify(foundUser)); // localStorage'ga saqlash
+//       return true;
+//     }
+//     return false;
+//   };
+
+//   const logout = async () => {
+//     try {
+//       await signOut(auth);
+//     } catch (e) {}
+//     setCurrentUser(null);
+//     localStorage.removeItem('current_user'); // Chiqib ketganda xotirani tozalash
+//   };
+
+//   const updateUser = async (updatedData) => {
+//     setCurrentUser(updatedData);
+//     localStorage.setItem('current_user', JSON.stringify(updatedData));
+//     if (updatedData.uid) {
+//       try {
+//         const userRef = doc(db, "users", updatedData.uid);
+//         await setDoc(userRef, updatedData, { merge: true });
+//       } catch (error) {}
+//     }
+//     const updatedUsers = users.map(u => u.email === updatedData.email ? updatedData : u);
+//     setUsers(updatedUsers);
+//   };
+
+//   return (
+//     <AuthContext.Provider value={{ currentUser, users, signup, login, logout, updateUser, loginWithGoogle, registerWithGoogle, loading }}>
+//       {!loading && children}
+//     </AuthContext.Provider>
+//   );
+// }
+
+
+
 import React, { createContext, useState, useEffect } from 'react';
 import { auth, googleProvider, db } from '../firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -7,7 +212,6 @@ export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
-    // Sahifa birinchi ochilganda localStorage'dan foydalanuvchini darhol o'qib turish
     const savedUser = localStorage.getItem('current_user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
@@ -15,7 +219,16 @@ export function AuthProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Firebase orqali foydalanuvchilar va joriy foydalanuvchini kuzatib borish
+  const fetchAllUsers = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "users"));
+      const usersList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setUsers(usersList);
+    } catch (error) {
+      console.error("Foydalanuvchilarni olishda xatolik:", error);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -23,32 +236,22 @@ export function AuthProvider({ children }) {
         const userSnap = await getDoc(userRef);
         
         if (userSnap.exists()) {
-          const userData = userSnap.data();
+          const userData = { id: userSnap.id, ...userSnap.data() };
           setCurrentUser(userData);
           localStorage.setItem('current_user', JSON.stringify(userData));
+        } else {
+          // Agar bazadan o'chirilgan bo'lsa-yu, sessiya qolgan bo'lsa
+          setCurrentUser(null);
+          localStorage.removeItem('current_user');
         }
-      } else {
-        // Faqat agar Firebase'da ham sessiya yo'q bo'lsa tozalaymiz
-        // (Email/Parol bilan kirganlar uchun localStorage ishlaydi)
       }
       setLoading(false);
     });
-
-    const fetchAllUsers = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        const usersList = querySnapshot.docs.map(doc => doc.data());
-        setUsers(usersList);
-      } catch (error) {
-        console.error("Foydalanuvchilarni olishda xatolik:", error);
-      }
-    };
 
     fetchAllUsers();
     return () => unsubscribe();
   }, []);
 
-  // 1. Google orqali RO'YXATDAN O'TISH
   const registerWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -68,23 +271,19 @@ export function AuthProvider({ children }) {
 
       const newUser = {
         uid: user.uid,
+        id: user.uid,
         username: user.displayName || "Foydalanuvchi",
         email: user.email,
         avatar: user.photoURL || "",
         role: "learner"
       };
 
-      return { 
-        success: true, 
-        user: newUser
-      };
+      return { success: true, user: newUser };
     } catch (error) {
-      console.error("Google orqali ro'yxatdan o'tishda xatolik:", error);
-      return { success: false, message: "Google orqali ro'yxatdan o'tishda xatolik yuz berdi: " + error.message };
+      return { success: false, message: "Google orqali ro'yxatdan o'tishda xatolik yuz berdi." };
     }
   };
 
-  // 2. Google orqali TIZIMGA KIRISH
   const loginWithGoogle = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -95,26 +294,23 @@ export function AuthProvider({ children }) {
 
       if (!userSnap.exists()) {
         await signOut(auth);
-        return { 
-          success: false, 
-          exists: false, 
-          message: "Bu akkaunt saytda mavjud emas, avval ro'yxatdan o'ting!" 
-        };
+        return { success: false, exists: false, message: "Bu akkaunt saytda mavjud emas!" };
       }
 
-      const userData = userSnap.data();
+      const userData = { id: userSnap.id, ...userSnap.data() };
       setCurrentUser(userData);
       localStorage.setItem('current_user', JSON.stringify(userData));
       return { success: true };
     } catch (error) {
-      console.error("Google orqali kirish xatoligi:", error);
-      return { success: false, message: "Google orqali kirishda xatolik yuz berdi: " + error.message };
+      return { success: false, message: "Google orqali kirishda xatolik yuz berdi." };
     }
   };
 
   const signup = async (userData) => {
     const trimmedEmail = userData.email.trim().toLowerCase();
     const trimmedUsername = userData.username.trim().toLowerCase();
+
+    await fetchAllUsers(); // Avval ro'yxatni yangilab tekshiramiz
 
     const usernameExists = users.some(u => u.username && u.username.trim().toLowerCase() === trimmedUsername);
     if (usernameExists) {
@@ -128,29 +324,12 @@ export function AuthProvider({ children }) {
 
     try {
       const userId = userData.uid || ('user_' + Date.now());
-      const newUser = { ...userData, uid: userId };
+      const newUser = { ...userData, id: userId, uid: userId };
 
-      // 1. Firebase'ga yozish
       const userRef = doc(db, "users", userId);
       await setDoc(userRef, newUser);
 
-      // 2. Admin panel uchun localStorage'ga ham qo'shib qo'yamiz
-      const existingLocalStorageUsers = JSON.parse(localStorage.getItem('skillswap_users')) || [];
-      const adminUserFormat = {
-        id: userId,
-        name: newUser.username,
-        email: newUser.email,
-        role: newUser.role || 'learner',
-        status: 'Faol',
-        createdAt: new Date().toISOString()
-      };
-      existingLocalStorageUsers.push(adminUserFormat);
-      localStorage.setItem('skillswap_users', JSON.stringify(existingLocalStorageUsers));
-
-      const updatedUsers = [...users, newUser];
-      setUsers(updatedUsers);
-      
-      // Joriy foydalanuvchini saqlash (Refresh qilinganda chiqib ketmasligi uchun)
+      setUsers(prev => [...prev, newUser]);
       setCurrentUser(newUser);
       localStorage.setItem('current_user', JSON.stringify(newUser));
 
@@ -167,7 +346,7 @@ export function AuthProvider({ children }) {
 
     if (foundUser) {
       setCurrentUser(foundUser);
-      localStorage.setItem('current_user', JSON.stringify(foundUser)); // localStorage'ga saqlash
+      localStorage.setItem('current_user', JSON.stringify(foundUser));
       return true;
     }
     return false;
@@ -178,20 +357,20 @@ export function AuthProvider({ children }) {
       await signOut(auth);
     } catch (e) {}
     setCurrentUser(null);
-    localStorage.removeItem('current_user'); // Chiqib ketganda xotirani tozalash
+    localStorage.removeItem('current_user');
   };
 
   const updateUser = async (updatedData) => {
     setCurrentUser(updatedData);
     localStorage.setItem('current_user', JSON.stringify(updatedData));
-    if (updatedData.uid) {
+    if (updatedData.uid || updatedData.id) {
       try {
-        const userRef = doc(db, "users", updatedData.uid);
+        const targetId = updatedData.uid || updatedData.id;
+        const userRef = doc(db, "users", targetId);
         await setDoc(userRef, updatedData, { merge: true });
       } catch (error) {}
     }
-    const updatedUsers = users.map(u => u.email === updatedData.email ? updatedData : u);
-    setUsers(updatedUsers);
+    setUsers(prev => prev.map(u => (u.email === updatedData.email ? updatedData : u)));
   };
 
   return (
